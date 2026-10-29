@@ -54,7 +54,9 @@ function cleanTitle(t) {
 }
 
 async function info(url) {
-  const urls = [url, url.replace('//www.', '//m.')];
+  // watch/?v=… hay bị chặn khi đọc từ máy chủ, cùng mã video dạng /reel/<mã>/ thì đọc được
+  const id = (url.match(/[?&]v=(\d+)|\/(?:videos|reel)\/(?:[^/]*\/)?(\d{8,})/) || []).slice(1).find(Boolean);
+  const urls = [url, ...(id ? ['https://www.facebook.com/reel/' + id + '/'] : []), url.replace('//www.', '//m.')];
   for (const u of urls) for (const ua of UAS) {
     try {
       const r = await get(u, ua);

@@ -94,6 +94,11 @@
   .ytc .tt { font-size:13px; font-weight:600; line-height:1.35; margin-top:7px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .ytc .ch { font-size:12px; color:var(--mute); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ytg .hint { color:var(--mute); font-size:13px; margin:0 4px; }
+  .ytask { width:100%; display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:16px; text-align:left;
+           background:var(--glass); border:1px dashed rgba(255,255,255,.22); font-size:14px; font-weight:600; }
+  .ytask .yt { width:26px; height:18px; border-radius:5px; background:#ff0033; display:grid; place-items:center; flex:none; }
+  .ytask .yt svg { width:9px; }
+  .ytask span { flex:1; } .ytask b { color:var(--mute); font-weight:400; }
 
   /* Xem ngang: khung phim phủ kín màn hình, xoay 90° nếu điện thoại đang dựng đứng */
   .ctrl .skip.xoay svg { width:22px; }
@@ -424,7 +429,17 @@ const YTC = 'xemtiep.yt';
 async function suggest(id) {
   const box = $('#ytg'), v = db[id];
   box.innerHTML = '';
-  if (!v || !v.name) return;
+  if (!v) return;
+  if (!v.name) {
+    // Facebook không cho đọc tên phim này → để anh gõ tên bộ, rồi tìm tập tiếp trên YouTube
+    if (v.yt) return;
+    box.innerHTML = '<button class="ytask"><div class="yt"><svg viewBox="0 0 10 12"><path d="M0 0v12l10-6z" fill="#fff"/></svg></div><span>Nhập tên phim để tìm tập tiếp trên YouTube</span><b>✎</b></button>';
+    box.querySelector('.ytask').onclick = () => {
+      const n = prompt('Tên bộ phim (ví dụ: Vô Linh Chứng Đạo):', '');
+      if (n && n.trim()) { v.name = n.trim(); save(); render(); suggest(id); }
+    };
+    return;
+  }
   const key = v.q || v.name;
   let c = {};
   try { c = JSON.parse(localStorage.getItem(YTC)) || {}; } catch {}
@@ -658,7 +673,7 @@ addEventListener('pagehide', record);
 document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
 
 // Điện thoại hay giữ bản cũ trong bộ nhớ đệm → hỏi máy chủ, có bản mới thì tải lại 1 lần
-const VER = '6';
+const VER = '7';
 fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/const VER = '(\d+)'/);
   if (m && m[1] !== VER && sessionStorage.getItem('xt.reload') !== m[1]) {
