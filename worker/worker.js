@@ -88,6 +88,9 @@ function seriesOf(title) {
 }
 const isoSec = d => { const m = (d || '').match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
 const norm = s => (s || '').toLowerCase().normalize('NFC').replace(/\s+/g, ' ').trim();
+const words = s => new Set(norm(s).split(/[^\p{L}\p{N}]+/u).filter(w => w.length > 0));
+// Tỉ lệ chữ của tên bộ có trong tiêu đề — mỗi kênh dịch tên một kiểu ("Huyền Học…Hả?" ↔ "Huyền Thuật…Sao?")
+const overlap = (series, title) => { const a = words(series), b = words(title); let n = 0; for (const w of a) if (b.has(w)) n++; return a.size ? n / a.size : 0; };
 
 async function ytSuggest(title, key) {
   const { series, author } = seriesOf(title);
@@ -98,7 +101,7 @@ async function ytSuggest(title, key) {
   const ids = (s.items || []).map(i => i.id.videoId).filter(Boolean);
   if (!ids.length) return { series, author, items: [] };
   const v = await (await fetch(api + 'videos?part=snippet,contentDetails,status&id=' + ids.join(',') + '&key=' + key)).json();
-  const ns = norm(series), na = norm(author);
+  const na = norm(author);
   // Giữ video đúng bộ (khớp tên hoặc đúng kênh); điểm "phát được trong app" chỉ để xếp trước
   const items = (v.items || []).map(x => ({
     id: x.id,
@@ -108,8 +111,11 @@ async function ytSuggest(title, key) {
     sec: isoSec(x.contentDetails.duration),
     emb: x.status.embeddable !== false,   // chủ kênh cấm nhúng → app chỉ mở được bằng app YouTube
     // Điểm: đúng kênh cùng tên trang FB + tiêu đề chứa tên bộ + phim dài (bản full)
-    score: (na && norm(x.snippet.channelTitle) === na ? 4 : 0) + (norm(x.snippet.title).includes(ns) ? 3 : 0) + (isoSec(x.contentDetails.duration) > 1800 ? 1 : 0) + (x.status.embeddable !== false ? 2 : 0),
-  })).filter(x => x.score - (x.emb ? 2 : 0) >= 3).sort((a, b) => b.score - a.score || ids.indexOf(a.id) - ids.indexOf(b.id));
+    hit: overlap(series, x.snippet.title),
+    same: !!na && norm(x.snippet.channelTitle) === na,
+    long: isoSec(x.contentDetails.duration) > 1800,
+  })).map(x => ({ ...x, score: x.hit * 6 + (x.same ? 4 : 0) + (x.long ? 1 : 0) + (x.emb ? 2 : 0) }))
+    .filter(x => x.hit >= 0.5 || x.same).sort((a, b) => b.score - a.score || ids.indexOf(a.id) - ids.indexOf(b.id));
   return { series, author, items: items.slice(0, 8) };
 }
 

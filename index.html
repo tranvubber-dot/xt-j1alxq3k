@@ -443,7 +443,8 @@ async function suggest(id) {
   const key = v.q || v.name;
   let c = {};
   try { c = JSON.parse(localStorage.getItem(YTC)) || {}; } catch {}
-  let j = c[key] && Date.now() - c[key].t < 864e5 ? c[key].j : null;
+  // Chỉ nhớ kết quả có gợi ý; rỗng thì lần sau hỏi lại (Worker có thể đã tìm tốt hơn)
+  let j = c[key] && Date.now() - c[key].t < 864e5 && (c[key].j.items || []).length ? c[key].j : null;
   if (!j) {
     try { j = await (await fetch(RESOLVER + '/?yt=' + encodeURIComponent(key))).json(); } catch { return; }
     if (j.error) return;
@@ -673,7 +674,7 @@ addEventListener('pagehide', record);
 document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
 
 // Điện thoại hay giữ bản cũ trong bộ nhớ đệm → hỏi máy chủ, có bản mới thì tải lại 1 lần
-const VER = '7';
+const VER = '8';
 fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/const VER = '(\d+)'/);
   if (m && m[1] !== VER && sessionStorage.getItem('xt.reload') !== m[1]) {
