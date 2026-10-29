@@ -75,6 +75,26 @@
   #player .fb-video, #player span, #player iframe { display:block !important; }
   #player .fbwrap { position:absolute; left:0; top:0; transform-origin:0 0; }
 
+  /* Gợi ý tập tiếp trên YouTube */
+  .ytg { margin-top:14px; }
+  .ytg:empty { display:none; }
+  .ytg-h { display:flex; align-items:center; gap:8px; margin:0 4px 10px; font-weight:800; font-size:15px; }
+  .ytg-h .yt { width:26px; height:18px; border-radius:5px; background:#ff0033; display:grid; place-items:center; flex:none; }
+  .ytg-h .yt svg { width:9px; }
+  .ytg-h span { color:var(--mute); font-weight:500; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ytg-list { display:flex; gap:10px; overflow-x:auto; scroll-snap-type:x mandatory; padding:0 2px 6px; margin:0 -2px;
+              scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .ytg-list::-webkit-scrollbar { display:none; }
+  .ytc { flex:none; width:196px; scroll-snap-align:start; cursor:pointer; text-align:left; padding:0; transition:transform .15s; }
+  .ytc:active { transform:scale(.97); }
+  .ytc .th { position:relative; aspect-ratio:16/9; border-radius:14px; overflow:hidden; background:var(--glass2) center/cover; border:1px solid var(--line); }
+  .ytc .th b { position:absolute; right:6px; bottom:6px; font-size:11px; font-weight:600; background:rgba(0,0,0,.75); padding:1px 6px; border-radius:6px; }
+  .ytc .th i { position:absolute; left:6px; top:6px; font-size:10px; font-style:normal; font-weight:800; background:var(--grad); padding:2px 7px; border-radius:6px; }
+  .ytc .th i.ra { background:#ff0033; }
+  .ytc .tt { font-size:13px; font-weight:600; line-height:1.35; margin-top:7px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .ytc .ch { font-size:12px; color:var(--mute); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ytg .hint { color:var(--mute); font-size:13px; margin:0 4px; }
+
   /* Xem ngang: khung phim phủ kín màn hình, xoay 90° nếu điện thoại đang dựng đứng */
   .ctrl .skip.xoay svg { width:22px; }
   .ngang-ui { display:none; }
@@ -88,10 +108,8 @@
           backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); opacity:.75; color:#fff; }
   .ngang-ui button:active { opacity:1; transform:scale(.92); }
   .ngang-ui button svg { width:20px; }
-  .ngang-ui .thoat { right:16px; }
-  .ngang-ui .lui { left:16px; } .ngang-ui .toi { left:66px; }
-  .ngang-ui .lui, .ngang-ui .toi { font-size:10px; font-weight:600; }
-  .ngang-ui .lui svg, .ngang-ui .toi svg { position:absolute; width:26px; opacity:.85; }
+  /* giữa mép trên: chỗ trống, không đè nút phóng to / âm lượng của trình phát */
+  .ngang-ui .thoat { left:50%; top:10px; margin-left:-21px; }
   @keyframes rise { from { opacity:0; transform:translateY(14px) scale(.98); } }
 
   .ctrl { display:flex; align-items:center; gap:10px; margin-top:12px; padding:8px; border-radius:18px;
@@ -164,7 +182,7 @@
 
   <div class="bar">
     <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
-    <input id="link" type="url" placeholder="Dán link video Facebook" autocomplete="off">
+    <input id="link" type="url" placeholder="Dán link video Facebook / YouTube" autocomplete="off">
     <button id="dan" class="btn ghost">Dán</button>
     <button id="xem" class="btn main">Xem</button>
   </div>
@@ -182,9 +200,8 @@
       <button class="skip xoay" id="ngang" aria-label="Xem ngang" title="Xem ngang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="2.5"/><path d="M8 4.5a9 9 0 0 1 9 0"/><path d="M15.5 3l1.5 1.5-1.5 1.5"/></svg></button>
     </div>
   </div>
+  <div class="ytg" id="ytg"></div>
   <div class="ngang-ui" id="ngangUi">
-    <button class="lui" data-skip="-10" aria-label="Lùi 10 giây"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg>10</button>
-    <button class="toi" data-skip="10" aria-label="Tới 10 giây"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4h-4"/></svg>10</button>
     <button class="thoat" id="thoat" aria-label="Thoát xem ngang"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
   </div>
 
@@ -229,6 +246,12 @@ function parse(raw) {
   if (!/^https?:\/\//.test(s)) s = 'https://' + s;
   let u;
   try { u = new URL(s); } catch { return null; }
+  // YouTube: watch?v=, youtu.be/, shorts/, live/
+  const yh = u.hostname.replace(/^(www|m|music)\./, '');
+  if (yh === 'youtu.be' || yh === 'youtube.com') {
+    const yv = yh === 'youtu.be' ? u.pathname.slice(1, 12) : u.searchParams.get('v') || (u.pathname.match(/\/(?:shorts|live|embed)\/([\w-]{11})/) || [])[1];
+    return /^[\w-]{11}$/.test(yv || '') ? { id: 'yt:' + yv, yt: yv, href: 'https://www.youtube.com/watch?v=' + yv } : null;
+  }
   if (!/(facebook\.com|fb\.watch|fb\.com)$/.test(u.hostname.replace(/^(www|m|web|mbasic)\./, ''))) return null;
   u.hostname = u.hostname.replace(/^(m|web|mbasic)\./, 'www.');
   let id = null, m;
@@ -266,12 +289,15 @@ function open(id) {
   // Trình phát cỡ vừa khung đứng; xem ngang thì phóng to bằng CSS → không phải tải lại phim
   const w = BIG = Math.min(box.parentElement.clientWidth, 760);
   box.innerHTML = '';
+  suggest(id);
+  if (v.yt) return openYT(id, box, w);
   const d = document.createElement('div');
   d.className = 'fb-video';
   d.id = 'vid' + Date.now();
   d.dataset.href = v.href;
   d.dataset.width = w;
-  d.dataset.allowfullscreen = 'true';
+  // Không cho FB tự bật toàn màn hình riêng (iPhone bật lên là dựng đứng, đè nút xem ngang)
+  d.dataset.allowfullscreen = 'false';
   d.dataset.showText = 'false';
   const wrap = document.createElement('div');
   wrap.className = 'fbwrap';
@@ -317,26 +343,124 @@ window.fbAsyncInit = function () {
   FB.Event.subscribe('xfbml.ready', e => {
     if (e.type !== 'video') return;
     player = e.instance;
-    watchSize();
-    clearTimeout(open.t);
-    const v = db[cur];
-    const xong = v && v.dur && v.pos > v.dur - 10;
-    msg(xong ? 'Phim này anh xem hết rồi — bấm ▶ để xem lại.' : v && v.pos > 5 ? 'Bấm ▶ để xem tiếp từ ' + fmt(v.pos) : '');
-    resume();
-    player.subscribe('startedPlaying', () => {
-      // Có máy không nhận tua khi chưa phát → tua lại lúc bắt đầu phát
-      const v = db[cur];
-      if (v && v.pos > 5 && player.getCurrentPosition() < v.pos - 8 && !startTick.once) {
-        startTick.once = true; player.seek(Math.max(0, v.pos - 3));
-      }
-      msg(''); startTick();
-    });
-    player.subscribe('paused', () => { record(); stopTick(); });
-    player.subscribe('finishedPlaying', () => { record(); stopTick(); if (db[cur]) { db[cur].pos = db[cur].dur || db[cur].pos; save(); render(); } });
+    onReady();
+    player.subscribe('startedPlaying', onPlay);
+    player.subscribe('paused', onPause);
+    player.subscribe('finishedPlaying', onEnd);
     player.subscribe('error', () => msg('Facebook báo lỗi khi phát video này.', true));
   });
   (whenFB.q || []).forEach(f => f()); whenFB.q = [];
 };
+
+// Dùng chung cho trình phát Facebook và YouTube
+function onReady() {
+  watchSize();
+  clearTimeout(open.t);
+  const v = db[cur];
+  const xong = v && v.dur && v.pos > v.dur - 10;
+  msg(xong ? 'Phim này anh xem hết rồi — bấm ▶ để xem lại.' : v && v.pos > 5 ? 'Bấm ▶ để xem tiếp từ ' + fmt(v.pos) : '');
+  resume();
+}
+function onPlay() {
+  // Có máy không nhận tua khi chưa phát → tua lại lúc bắt đầu phát
+  const v = db[cur];
+  if (v && v.pos > 5 && player.getCurrentPosition() < v.pos - 8 && !startTick.once && !(v.dur && v.pos > v.dur - 10)) {
+    startTick.once = true; player.seek(Math.max(0, v.pos - 3));
+  }
+  msg(''); startTick();
+}
+function onPause() { record(); stopTick(); }
+function onEnd() { record(); stopTick(); if (db[cur]) { db[cur].pos = db[cur].dur || db[cur].pos; save(); render(); } }
+
+// ---- YouTube ----
+function whenYT(fn) {
+  if (window.YT && YT.Player) return fn();
+  (whenYT.q = whenYT.q || []).push(fn);
+  if (whenYT.q.length > 1) return;
+  window.onYouTubeIframeAPIReady = () => { whenYT.q.forEach(f => f()); whenYT.q = []; };
+  const s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+}
+function openYT(id, box, w) {
+  const v = db[id];
+  const wrap = document.createElement('div');
+  wrap.className = 'fbwrap';
+  wrap.style.width = w + 'px';
+  const d = document.createElement('div');
+  wrap.appendChild(d);
+  box.appendChild(wrap);
+  layout();
+  msg(v.pos > 5 && !(v.dur && v.pos > v.dur - 10) ? 'Đang mở… sẽ xem tiếp từ ' + fmt(v.pos) : 'Đang mở…');
+  showTime(v);
+  render();
+  const from = v.pos > 5 && !(v.dur && v.pos > v.dur - 10) ? Math.floor(v.pos - 3) : 0;
+  whenYT(() => {
+    if (cur !== id) return;
+    const yt = new YT.Player(d, {
+      width: w, height: Math.round(w * 9 / 16), videoId: v.yt,
+      playerVars: { playsinline: 1, rel: 0, modestbranding: 1, start: from },
+      events: {
+        onReady: () => {
+          if (cur !== id) return;
+          player = {
+            seek: s => yt.seekTo(s, true), getCurrentPosition: () => yt.getCurrentTime(), getDuration: () => yt.getDuration(),
+            play: () => yt.playVideo(), pause: () => yt.pauseVideo(), mute: () => yt.mute(),
+          };
+          resumed = true;   // đã mở đúng chỗ bằng tham số start
+          const t = yt.getVideoData && yt.getVideoData().title;
+          if (t && !v.name) { v.name = t; save(); render(); }
+          onReady();
+        },
+        onStateChange: e => { if (cur !== id) return; if (e.data === 1) onPlay(); else if (e.data === 2) onPause(); else if (e.data === 0) onEnd(); },
+        onError: e => msg(e.data === 101 || e.data === 150 ? 'Chủ kênh không cho phát video này ngoài YouTube — mở bằng app YouTube nhé.' : 'YouTube báo lỗi khi phát video này.', true),
+      },
+    });
+  });
+}
+
+// Gợi ý xem tiếp trên YouTube theo tên bộ phim (Worker tìm bằng YouTube API, nhớ 1 ngày)
+const YTC = 'xemtiep.yt';
+async function suggest(id) {
+  const box = $('#ytg'), v = db[id];
+  box.innerHTML = '';
+  if (!v || !v.name) return;
+  const key = v.q || v.name;
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(YTC)) || {}; } catch {}
+  let j = c[key] && Date.now() - c[key].t < 864e5 ? c[key].j : null;
+  if (!j) {
+    try { j = await (await fetch(RESOLVER + '/?yt=' + encodeURIComponent(key))).json(); } catch { return; }
+    if (j.error) return;
+    c[key] = { t: Date.now(), j };
+    for (const k of Object.keys(c).sort((a, b) => c[b].t - c[a].t).slice(30)) delete c[k];
+    try { localStorage.setItem(YTC, JSON.stringify(c)); } catch {}
+  }
+  if (cur !== id) return;
+  const items = (j.items || []).filter(x => 'yt:' + x.id !== id);
+  if (!items.length) return;
+  box.innerHTML = '<div class="ytg-h"><div class="yt"><svg viewBox="0 0 10 12"><path d="M0 0v12l10-6z" fill="#fff"/></svg></div>Xem tiếp trên YouTube <span></span></div><div class="ytg-list"></div>';
+  box.querySelector('.ytg-h span').textContent = '· ' + j.series;
+  for (const x of items) {
+    const b = document.createElement('button');
+    b.className = 'ytc';
+    b.innerHTML = '<div class="th"><b></b></div><div class="tt"></div><div class="ch"></div>';
+    b.querySelector('.th').style.backgroundImage = 'url(' + x.thumb + ')';
+    b.querySelector('.th b').textContent = x.sec ? fmt(x.sec) : '';
+    if (db['yt:' + x.id]) b.querySelector('.th').insertAdjacentHTML('beforeend', '<i>ĐANG XEM</i>');
+    else if (x.emb === false) b.querySelector('.th').insertAdjacentHTML('beforeend', '<i class="ra">MỞ YOUTUBE ↗</i>');
+    b.querySelector('.tt').textContent = x.title;
+    b.querySelector('.ch').textContent = x.channel;
+    b.onclick = () => {
+      // Chủ kênh cấm phát ngoài YouTube → mở thẳng app YouTube
+      if (x.emb === false) { location.href = 'https://www.youtube.com/watch?v=' + x.id; return; }
+      const k = 'yt:' + x.id;
+      if (!db[k]) db[k] = { href: 'https://www.youtube.com/watch?v=' + x.id, yt: x.id, name: x.title, thumb: x.thumb.replace('mqdefault', 'hqdefault'), q: j.series, pos: 0, dur: x.sec || 0, added: Date.now(), last: Date.now() };
+      save(); startTick.once = false; open(k); scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    box.querySelector('.ytg-list').appendChild(b);
+  }
+}
 
 // Link rút gọn (share/v, fb.watch) phải nhờ máy chủ đổi ra link thật thì mới nhúng được
 const RESOLVER = /^(localhost|127\.)/.test(location.hostname) && new URLSearchParams(location.search).get('w') || 'https://xem-tiep-fb.vtcom-jdy2qkpq.workers.dev';
@@ -344,7 +468,7 @@ const isShort = href => /facebook\.com\/share\/|fb\.watch\//.test(href);
 
 async function go() {
   let r = parse($('#link').value);
-  if (!r) { msg('Link này không phải link Facebook.', true); return; }
+  if (!r) { msg('Link này không phải link Facebook hay YouTube.', true); return; }
   let j = null;
   if (isShort(r.href)) {
     msg('Đang đổi link rút gọn…');
@@ -358,26 +482,26 @@ async function go() {
       return;
     }
   }
-  if (!db[r.id]) db[r.id] = { href: r.href, name: '', pos: 0, dur: 0, added: Date.now(), last: Date.now() };
+  if (!db[r.id]) db[r.id] = { href: r.href, name: '', pos: 0, dur: 0, added: Date.now(), last: Date.now(), ...(r.yt ? { yt: r.yt, thumb: 'https://i.ytimg.com/vi/' + r.yt + '/hqdefault.jpg' } : {}) };
   else db[r.id].href = r.href;
   save();
   startTick.once = false;
   open(r.id);
-  j ? applyInfo(r.id, j) : fetchInfo(r.id);
+  if (!r.yt) j ? applyInfo(r.id, j) : fetchInfo(r.id);
 }
 
 // Tên phim + ảnh bìa lấy từ trang Facebook (qua Worker). Ảnh fbcdn hết hạn sau vài ngày
 // nên thu nhỏ rồi cất luôn trong máy.
 async function fetchInfo(id) {
   const v = db[id];
-  if (!v || fetchInfo[id]) return;
+  if (!v || v.yt || fetchInfo[id]) return;
   fetchInfo[id] = 1;
   try { applyInfo(id, await (await fetch(RESOLVER + '/?u=' + encodeURIComponent(v.href))).json()); } catch {}
 }
 function applyInfo(id, j) {
   const v = db[id];
   if (!v || !j) return;
-  if (j.title && !v.name) { v.name = j.title; save(); render(); }
+  if (j.title && !v.name) { v.name = j.title; save(); render(); if (id === cur) suggest(id); }
   if (j.image && !v.thumb) {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -453,7 +577,7 @@ function render() {
         closeMenus();
         if (!confirm('Bỏ "' + nameOf(v, id) + '" khỏi danh sách?')) return;
         delete db[id]; save();
-        if (id === cur) { cur = null; player = null; stopTick(); $('#player').innerHTML = ''; $('#stage').classList.remove('on'); msg(''); }
+        if (id === cur) { cur = null; player = null; stopTick(); $('#player').innerHTML = ''; $('#stage').classList.remove('on'); $('#ytg').innerHTML = ''; msg(''); }
         render();
       };
       el.appendChild(m);
@@ -479,7 +603,10 @@ let BIG = 1280;
 function layout() {
   const box = $('#player'), fv = box.querySelector('.fbwrap'), f = box.querySelector('iframe');
   if (!fv) return;
-  const W = (f && f.offsetWidth) || BIG, H = (f && f.offsetHeight) || BIG * 9 / 16;
+  const W = (f && f.offsetWidth) || BIG;
+  // Lúc FB chưa tải xong, khung tạm cao 1000px → bỏ qua, coi như 16:9
+  let H = f ? f.offsetHeight : 0;
+  if (!H || H > W * 2) H = W * 9 / 16;
   fv.style.width = W + 'px';
   const ui = $('#ngangUi');
   if (!document.body.classList.contains('ngang')) {
@@ -531,7 +658,7 @@ addEventListener('pagehide', record);
 document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
 
 // Điện thoại hay giữ bản cũ trong bộ nhớ đệm → hỏi máy chủ, có bản mới thì tải lại 1 lần
-const VER = '4';
+const VER = '6';
 fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/const VER = '(\d+)'/);
   if (m && m[1] !== VER && sessionStorage.getItem('xt.reload') !== m[1]) {
@@ -543,7 +670,10 @@ fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).the
 // Mở lại app → tự mở phim xem gần nhất
 render();
 for (const id in db) if (!db[id].name || !db[id].thumb) fetchInfo(id);
-const last =Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
+// Mở app kèm link (?add=...) — dùng cho phím tắt Chia sẻ trên điện thoại
+const addLink = new URLSearchParams(location.search).get('add');
+if (addLink) { history.replaceState(null, '', location.pathname); $('#link').value = addLink; go(); }
+const last = addLink ? null : Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
 if (last) open(last);
 </script>
 <script async defer crossorigin="anonymous" src="https://connect.facebook.net/vi_VN/sdk.js"></script>

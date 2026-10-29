@@ -69,8 +69,50 @@ async function info(url) {
   return {};
 }
 
+// ---- Gợi ý YouTube: từ tên phim Facebook rút ra tên bộ, tìm bằng YouTube Data API ----
+const NOISE = /^(\[?\d+\+\]?\s*)?(full|trọn bộ|mùa|ss|season|phần|tập|p\s?\d|end\b|bản đầy đủ)/i;
+function seriesOf(title) {
+  const t = title.replace(/\[\d+\+\]\s*/g, '');
+  const parts = t.split(/\s+\|\s+/).map(s => s.trim()).filter(Boolean);
+  const author = parts.length > 1 ? parts[parts.length - 1] : '';
+  const q = t.match(/[《«“](.+?)[》»”]/);
+  if (q) return { series: q[1].trim(), author };
+  const body = parts.slice(0, parts.length > 1 ? -1 : undefined).filter(p => !NOISE.test(p) || p.length > 25)
+    .map(p => p.replace(NOISE, '').replace(/^[\s\d\-–:|]+/, '').trim());
+  const best = body.sort((a, b) => b.length - a.length)[0];
+  // Chỉ còn phần "Mùa 4 - 6" → phần cuối là tên bộ, không phải tên trang
+  if (!best) return { series: (parts[parts.length - 1] || '').slice(0, 80), author: '' };
+  return { series: best.slice(0, 80), author };
+}
+const isoSec = d => { const m = (d || '').match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/); return m ? (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0) : 0; };
+const norm = s => (s || '').toLowerCase().normalize('NFC').replace(/\s+/g, ' ').trim();
+
+async function ytSuggest(title, key) {
+  const { series, author } = seriesOf(title);
+  if (!series) return { error: 'không rút được tên bộ' };
+  const api = 'https://www.googleapis.com/youtube/v3/';
+  const s = await (await fetch(api + 'search?part=snippet&type=video&maxResults=12&relevanceLanguage=vi&q=' + encodeURIComponent(series) + '&key=' + key)).json();
+  if (s.error) return { error: s.error.message };
+  const ids = (s.items || []).map(i => i.id.videoId).filter(Boolean);
+  if (!ids.length) return { series, author, items: [] };
+  const v = await (await fetch(api + 'videos?part=snippet,contentDetails,status&id=' + ids.join(',') + '&key=' + key)).json();
+  const ns = norm(series), na = norm(author);
+  // Giữ video đúng bộ (khớp tên hoặc đúng kênh); điểm "phát được trong app" chỉ để xếp trước
+  const items = (v.items || []).map(x => ({
+    id: x.id,
+    title: decode(x.snippet.title),
+    channel: x.snippet.channelTitle,
+    thumb: 'https://i.ytimg.com/vi/' + x.id + '/mqdefault.jpg',
+    sec: isoSec(x.contentDetails.duration),
+    emb: x.status.embeddable !== false,   // chủ kênh cấm nhúng → app chỉ mở được bằng app YouTube
+    // Điểm: đúng kênh cùng tên trang FB + tiêu đề chứa tên bộ + phim dài (bản full)
+    score: (na && norm(x.snippet.channelTitle) === na ? 4 : 0) + (norm(x.snippet.title).includes(ns) ? 3 : 0) + (isoSec(x.contentDetails.duration) > 1800 ? 1 : 0) + (x.status.embeddable !== false ? 2 : 0),
+  })).filter(x => x.score - (x.emb ? 2 : 0) >= 3).sort((a, b) => b.score - a.score || ids.indexOf(a.id) - ids.indexOf(b.id));
+  return { series, author, items: items.slice(0, 8) };
+}
+
 export default {
-  async fetch(req) {
+  async fetch(req, env) {
     const origin = req.headers.get('Origin') || '';
     const cors = {
       'Access-Control-Allow-Origin': OK_ORIGINS.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) ? origin : OK_ORIGINS[0],
@@ -78,6 +120,11 @@ export default {
     };
     const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { ...cors, 'Content-Type': 'application/json' } });
     const q = new URL(req.url).searchParams;
+
+    if (q.get('yt')) {
+      if (!env.YT_API_KEY) return json({ error: 'chưa có khoá YouTube' }, 503);
+      try { return json(await ytSuggest(q.get('yt'), env.YT_API_KEY)); } catch (e) { return json({ error: String(e) }, 502); }
+    }
 
     if (q.get('img')) {
       let iu;
