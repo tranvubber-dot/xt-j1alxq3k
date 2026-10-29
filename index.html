@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Xem Tiếp">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Xem Tiếp</title>
+<style>
+  :root { --bg:#0f1115; --card:#191c23; --line:#2a2f3a; --text:#eef0f4; --mute:#8b93a3; --acc:#1877f2; --ok:#3ecf8e; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 -apple-system, system-ui, sans-serif;
+         padding:max(12px, env(safe-area-inset-top)) 12px max(24px, env(safe-area-inset-bottom)); }
+  .wrap { max-width:720px; margin:0 auto; }
+  h1 { font-size:20px; margin:4px 0 12px; display:flex; align-items:center; gap:8px; }
+  h1 span { color:var(--acc); }
+  .bar { display:flex; gap:8px; }
+  input { flex:1; min-width:0; background:var(--card); border:1px solid var(--line); color:var(--text);
+          border-radius:12px; padding:12px; font-size:16px; }
+  button { background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:12px;
+           padding:10px 14px; font-size:15px; cursor:pointer; white-space:nowrap; }
+  button.main { background:var(--acc); border-color:var(--acc); font-weight:600; }
+  #player { margin:12px 0 8px; background:#000; border-radius:12px; overflow:hidden; min-height:0; }
+  #player:empty { display:none; }
+  .ctrl { display:none; align-items:center; gap:8px; margin-bottom:6px; }
+  .ctrl.on { display:flex; }
+  .ctrl .t { flex:1; color:var(--mute); font-variant-numeric:tabular-nums; }
+  .note { color:var(--mute); font-size:13px; margin:6px 0; }
+  .err { color:#ff8a80; }
+  h2 { font-size:15px; color:var(--mute); font-weight:500; margin:22px 0 8px; }
+  .item { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:8px;
+          display:flex; gap:10px; align-items:center; }
+  .item.cur { border-color:var(--acc); }
+  .item .info { flex:1; min-width:0; cursor:pointer; }
+  .item .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+  .item .sub { color:var(--mute); font-size:13px; font-variant-numeric:tabular-nums; }
+  .prog { height:4px; background:var(--line); border-radius:2px; margin-top:6px; overflow:hidden; }
+  .prog i { display:block; height:100%; background:var(--acc); }
+  .prog i.done { background:var(--ok); }
+  .item button { padding:6px 9px; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>▶︎ Xem <span>Tiếp</span></h1>
+  <div class="bar">
+    <input id="link" type="url" placeholder="Dán link video Facebook…" autocomplete="off">
+    <button id="dan" title="Dán từ bộ nhớ tạm">Dán</button>
+    <button id="xem" class="main">Xem</button>
+  </div>
+  <div id="msg" class="note"></div>
+  <div id="player"></div>
+  <div id="ctrl" class="ctrl">
+    <button data-skip="-10">⟲ 10s</button>
+    <span class="t" id="tnow"></span>
+    <button data-skip="10">10s ⟳</button>
+  </div>
+  <h2 id="dsTitle">Đang xem dở</h2>
+  <div id="ds"></div>
+</div>
+
+<div id="fb-root"></div>
+<script>
+const KEY = 'xemtiep.v1';
+let db = load();
+let cur = null;      // id đang mở
+let player = null;
+let tick = null;
+let resumed = false;
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
+const $ = s => document.querySelector(s);
+
+function fmt(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+}
+
+// Rút link về dạng gọn + lấy mã video làm khoá, để cùng 1 phim dán link khác kiểu vẫn nhận ra
+function parse(raw) {
+  let s = (raw || '').trim();
+  const m0 = s.match(/https?:\/\/\S+/);
+  if (m0) s = m0[0];
+  if (!/^https?:\/\//.test(s)) s = 'https://' + s;
+  let u;
+  try { u = new URL(s); } catch { return null; }
+  if (!/(facebook\.com|fb\.watch|fb\.com)$/.test(u.hostname.replace(/^(www|m|web|mbasic)\./, ''))) return null;
+  u.hostname = u.hostname.replace(/^(m|web|mbasic)\./, 'www.');
+  let id = null, m;
+  if ((m = u.pathname.match(/\/(?:videos|reel|watch\/live)\/(?:[^/]*\/)?(\d{6,})/))) id = m[1];
+  else if (u.searchParams.get('v')) id = u.searchParams.get('v');
+  else if (u.searchParams.get('story_fbid')) id = u.searchParams.get('story_fbid');
+  const keep = new URLSearchParams();
+  for (const k of ['v', 'story_fbid', 'id']) if (u.searchParams.get(k)) keep.set(k, u.searchParams.get(k));
+  const q = keep.toString();
+  const href = u.origin + u.pathname + (q ? '?' + q : '');
+  return { id: id || href, href };
+}
+
+function msg(t, bad) { $('#msg').textContent = t || ''; $('#msg').className = 'note' + (bad ? ' err' : ''); }
+
+function open(id) {
+  const v = db[id];
+  if (!v) return;
+  stopTick();
+  cur = id; player = null; resumed = false;
+  v.last = Date.now(); save();
+  $('#link').value = v.href;
+  const box = $('#player');
+  const w = Math.min(box.parentElement.clientWidth, 720);
+  box.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'fb-video';
+  d.id = 'vid' + Date.now();
+  d.dataset.href = v.href;
+  d.dataset.width = w;
+  d.dataset.allowfullscreen = 'true';
+  d.dataset.showText = 'false';
+  box.appendChild(d);
+  msg(v.pos > 5 ? 'Đang mở… sẽ xem tiếp từ ' + fmt(v.pos) : 'Đang mở…');
+  $('#ctrl').classList.add('on');
+  $('#tnow').textContent = v.pos ? fmt(v.pos) : '';
+  render();
+  whenFB(() => FB.XFBML.parse(box));
+  clearTimeout(open.t);
+  open.t = setTimeout(() => {
+    if (cur === id && !player) msg('Video không mở được — có thể video riêng tư / trong nhóm kín, hoặc link rút gọn. Mở video trên Facebook, bấm Chia sẻ → Sao chép liên kết, hoặc copy link từ thanh địa chỉ.', true);
+  }, 15000);
+}
+
+function resume() {
+  const v = db[cur];
+  if (resumed || !player || !v) return;
+  resumed = true;
+  if (v.pos > 5 && !(v.dur && v.pos > v.dur - 10)) player.seek(Math.max(0, v.pos - 3));
+}
+
+function record() {
+  if (!player || !cur || !db[cur]) return;
+  const p = player.getCurrentPosition(), d = player.getDuration();
+  if (!(p >= 0)) return;
+  const v = db[cur];
+  // Lúc mới mở, player báo 0 trước khi tua — đừng ghi đè vị trí cũ
+  if (!resumed || (p < 2 && v.pos > 10)) return;
+  v.pos = p; if (d > 0) v.dur = d; v.last = Date.now();
+  save();
+  $('#tnow').textContent = fmt(p) + (v.dur ? ' / ' + fmt(v.dur) : '');
+  renderOne(cur);
+}
+function startTick() { stopTick(); tick = setInterval(record, 2000); }
+function stopTick() { if (tick) clearInterval(tick); tick = null; }
+
+function whenFB(fn) { window.FB ? fn() : (whenFB.q = whenFB.q || []).push(fn); }
+window.fbAsyncInit = function () {
+  FB.init({ xfbml: false, version: 'v21.0' });
+  FB.Event.subscribe('xfbml.ready', e => {
+    if (e.type !== 'video') return;
+    player = e.instance;
+    clearTimeout(open.t);
+    const v = db[cur];
+    msg(v && v.pos > 5 ? 'Bấm phát để xem tiếp từ ' + fmt(v.pos) : '');
+    resume();
+    player.subscribe('startedPlaying', () => {
+      // Có máy không nhận tua khi chưa phát → tua lại lúc bắt đầu phát
+      const v = db[cur];
+      if (v && v.pos > 5 && player.getCurrentPosition() < v.pos - 8 && !startTick.once) {
+        startTick.once = true; player.seek(Math.max(0, v.pos - 3));
+      }
+      msg(''); startTick();
+    });
+    player.subscribe('paused', () => { record(); stopTick(); });
+    player.subscribe('finishedPlaying', () => { record(); stopTick(); if (db[cur]) { db[cur].pos = db[cur].dur || db[cur].pos; save(); render(); } });
+    player.subscribe('error', () => msg('Facebook báo lỗi khi phát video này.', true));
+  });
+  (whenFB.q || []).forEach(f => f()); whenFB.q = [];
+};
+
+function go() {
+  const r = parse($('#link').value);
+  if (!r) { msg('Link này không phải link Facebook.', true); return; }
+  if (!db[r.id]) db[r.id] = { href: r.href, name: '', pos: 0, dur: 0, added: Date.now(), last: Date.now() };
+  else db[r.id].href = r.href;
+  save();
+  startTick.once = false;
+  open(r.id);
+}
+
+function nameOf(v, id) { return v.name || ('Video ' + (/^\d+$/.test(id) ? '…' + id.slice(-5) : v.href.replace(/^https:\/\/www\./, ''))); }
+
+function renderOne(id) {
+  const el = document.querySelector('[data-id="' + CSS.escape(id) + '"]');
+  if (!el) return render();
+  const v = db[id];
+  const pct = v.dur ? Math.min(100, v.pos / v.dur * 100) : 0;
+  el.querySelector('.sub').textContent = fmt(v.pos) + (v.dur ? ' / ' + fmt(v.dur) + ' · còn ' + fmt(v.dur - v.pos) : '');
+  const i = el.querySelector('.prog i'); i.style.width = pct + '%'; i.classList.toggle('done', pct > 97);
+}
+
+function render() {
+  const ids = Object.keys(db).sort((a, b) => db[b].last - db[a].last);
+  $('#dsTitle').style.display = ids.length ? '' : 'none';
+  $('#ds').innerHTML = '';
+  for (const id of ids) {
+    const v = db[id];
+    const el = document.createElement('div');
+    el.className = 'item' + (id === cur ? ' cur' : '');
+    el.dataset.id = id;
+    el.innerHTML = '<div class="info"><div class="name"></div><div class="sub"></div><div class="prog"><i></i></div></div>' +
+      '<button class="ren" title="Đặt tên">✎</button><button class="del" title="Xoá khỏi danh sách">✕</button>';
+    el.querySelector('.name').textContent = nameOf(v, id);
+    el.querySelector('.info').onclick = () => { startTick.once = false; open(id); scrollTo({ top: 0, behavior: 'smooth' }); };
+    el.querySelector('.ren').onclick = () => {
+      const n = prompt('Tên phim:', v.name || '');
+      if (n !== null) { v.name = n.trim(); save(); render(); }
+    };
+    el.querySelector('.del').onclick = () => {
+      if (!confirm('Bỏ "' + nameOf(v, id) + '" khỏi danh sách?')) return;
+      delete db[id]; save();
+      if (id === cur) { cur = null; player = null; stopTick(); $('#player').innerHTML = ''; $('#ctrl').classList.remove('on'); msg(''); }
+      render();
+    };
+    $('#ds').appendChild(el);
+    renderOne(id);
+  }
+}
+
+$('#xem').onclick = go;
+$('#link').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+$('#dan').onclick = async () => {
+  try { $('#link').value = await navigator.clipboard.readText(); go(); }
+  catch { $('#link').focus(); msg('Nhấn giữ ô trên rồi chọn Dán.'); }
+};
+document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => {
+  if (!player) return;
+  player.seek(Math.max(0, player.getCurrentPosition() + +b.dataset.skip));
+  setTimeout(record, 400);
+});
+addEventListener('pagehide', record);
+document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
+
+// Mở lại app → tự mở phim xem gần nhất
+render();
+const last = Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
+if (last) open(last);
+</script>
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/vi_VN/sdk.js"></script>
+</body>
+</html>
