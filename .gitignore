@@ -1,3 +1,5 @@
 .repo_name
 _backup
 QR_XemTiep.png
+worker/.wrangler
+worker/node_modules

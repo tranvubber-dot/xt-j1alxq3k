@@ -305,9 +305,25 @@ window.fbAsyncInit = function () {
   (whenFB.q || []).forEach(f => f()); whenFB.q = [];
 };
 
-function go() {
-  const r = parse($('#link').value);
+// Link rút gọn (share/v, fb.watch) phải nhờ máy chủ đổi ra link thật thì mới nhúng được
+const RESOLVER = /^(localhost|127\.)/.test(location.hostname) && new URLSearchParams(location.search).get('w') || 'https://xem-tiep-fb.vtcom-jdy2qkpq.workers.dev';
+const isShort = href => /facebook\.com\/share\/|fb\.watch\//.test(href);
+
+async function go() {
+  let r = parse($('#link').value);
   if (!r) { msg('Link này không phải link Facebook.', true); return; }
+  if (isShort(r.href)) {
+    msg('Đang đổi link rút gọn…');
+    try {
+      const j = await (await fetch(RESOLVER + '/?u=' + encodeURIComponent(r.href))).json();
+      const r2 = j.url && parse(j.url);
+      if (!r2 || isShort(r2.href)) throw 0;
+      r = r2;
+    } catch {
+      msg('Không đổi được link rút gọn này. Mở video trên Facebook, copy link trên thanh địa chỉ rồi dán lại.', true);
+      return;
+    }
+  }
   if (!db[r.id]) db[r.id] = { href: r.href, name: '', pos: 0, dur: 0, added: Date.now(), last: Date.now() };
   else db[r.id].href = r.href;
   save();
