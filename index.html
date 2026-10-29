@@ -415,6 +415,16 @@ document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => {
 addEventListener('pagehide', record);
 document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
 
+// Điện thoại hay giữ bản cũ trong bộ nhớ đệm → hỏi máy chủ, có bản mới thì tải lại 1 lần
+const VER = '3';
+fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
+  const m = t.match(/const VER = '(\d+)'/);
+  if (m && m[1] !== VER && sessionStorage.getItem('xt.reload') !== m[1]) {
+    sessionStorage.setItem('xt.reload', m[1]);
+    location.replace(location.pathname + '?v=' + m[1]);
+  }
+}).catch(() => {});
+
 // Mở lại app → tự mở phim xem gần nhất
 render();
 const last = Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
