@@ -115,7 +115,8 @@ async function ytSuggest(title, key) {
     same: !!na && norm(x.snippet.channelTitle) === na,
     long: isoSec(x.contentDetails.duration) > 1800,
   })).map(x => ({ ...x, score: x.hit * 6 + (x.same ? 4 : 0) + (x.long ? 1 : 0) + (x.emb ? 2 : 0) }))
-    .filter(x => x.hit >= 0.5 || x.same).sort((a, b) => b.score - a.score || ids.indexOf(a.id) - ids.indexOf(b.id));
+    // Tên ngắn (≤5 chữ) dễ trùng nhầm phim khác → phải đủ chữ; tên dài thì trùng nửa là được
+    .filter(x => x.hit >= (words(series).size <= 5 ? 1 : 0.5) || x.same).sort((a, b) => b.score - a.score || ids.indexOf(a.id) - ids.indexOf(b.id));
   return { series, author, items: items.slice(0, 8) };
 }
 
