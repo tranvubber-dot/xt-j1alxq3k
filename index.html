@@ -71,7 +71,27 @@
   .stage::before { content:''; position:absolute; inset:8% 6% -6%; background:var(--grad); filter:blur(40px); opacity:.45; border-radius:30px; z-index:-1; }
   #player { background:#000; border-radius:20px; overflow:hidden; border:1px solid var(--line); min-height:120px;
             box-shadow:0 30px 60px -20px rgba(0,0,0,.8); }
+  #player { position:relative; }
   #player .fb-video, #player span, #player iframe { display:block !important; }
+  #player .fbwrap { position:absolute; left:0; top:0; transform-origin:0 0; }
+
+  /* Xem ngang: khung phim phủ kín màn hình, xoay 90° nếu điện thoại đang dựng đứng */
+  .ctrl .skip.xoay svg { width:22px; }
+  .ngang-ui { display:none; }
+  body.ngang { overflow:hidden; }
+  body.ngang .stage { position:fixed; inset:0; z-index:100; margin:0; background:#000; animation:none; }
+  body.ngang .stage::before, body.ngang .ctrl { display:none; }
+  body.ngang #player { position:absolute; inset:0; height:auto !important; border-radius:0; border:0; box-shadow:none; }
+  body.ngang .ngang-ui { display:block; position:fixed; left:0; top:0; z-index:101; pointer-events:none; transform-origin:0 0; }
+  .ngang-ui button { pointer-events:auto; position:absolute; top:14px; width:42px; height:42px; border-radius:50%;
+          background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.18); display:grid; place-items:center;
+          backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); opacity:.75; color:#fff; }
+  .ngang-ui button:active { opacity:1; transform:scale(.92); }
+  .ngang-ui button svg { width:20px; }
+  .ngang-ui .thoat { right:16px; }
+  .ngang-ui .lui { left:16px; } .ngang-ui .toi { left:66px; }
+  .ngang-ui .lui, .ngang-ui .toi { font-size:10px; font-weight:600; }
+  .ngang-ui .lui svg, .ngang-ui .toi svg { position:absolute; width:26px; opacity:.85; }
   @keyframes rise { from { opacity:0; transform:translateY(14px) scale(.98); } }
 
   .ctrl { display:flex; align-items:center; gap:10px; margin-top:12px; padding:8px; border-radius:18px;
@@ -159,7 +179,13 @@
         <div class="track"><i id="tbar"></i></div>
       </div>
       <button class="skip" data-skip="10" aria-label="Tới 10 giây"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4h-4"/></svg>10</button>
+      <button class="skip xoay" id="ngang" aria-label="Xem ngang" title="Xem ngang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="11" rx="2.5"/><path d="M8 4.5a9 9 0 0 1 9 0"/><path d="M15.5 3l1.5 1.5-1.5 1.5"/></svg></button>
     </div>
+  </div>
+  <div class="ngang-ui" id="ngangUi">
+    <button class="lui" data-skip="-10" aria-label="Lùi 10 giây"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg>10</button>
+    <button class="toi" data-skip="10" aria-label="Tới 10 giây"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4h-4"/></svg>10</button>
+    <button class="thoat" id="thoat" aria-label="Thoát xem ngang"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
   </div>
 
   <div class="sec" id="sec"><h2>Đang xem dở</h2><span id="count"></span></div>
@@ -237,7 +263,8 @@ function open(id) {
   $('#link').value = v.href;
   const box = $('#player');
   $('#stage').classList.add('on');
-  const w = Math.min(box.parentElement.clientWidth, 760);
+  // Trình phát cỡ vừa khung đứng; xem ngang thì phóng to bằng CSS → không phải tải lại phim
+  const w = BIG = Math.min(box.parentElement.clientWidth, 760);
   box.innerHTML = '';
   const d = document.createElement('div');
   d.className = 'fb-video';
@@ -246,11 +273,16 @@ function open(id) {
   d.dataset.width = w;
   d.dataset.allowfullscreen = 'true';
   d.dataset.showText = 'false';
-  box.appendChild(d);
+  const wrap = document.createElement('div');
+  wrap.className = 'fbwrap';
+  wrap.style.width = w + 'px';
+  wrap.appendChild(d);
+  box.appendChild(wrap);
+  layout();
   msg(v.pos > 5 && !(v.dur && v.pos > v.dur - 10) ? 'Đang mở… sẽ xem tiếp từ ' + fmt(v.pos) : 'Đang mở…');
   showTime(v);
   render();
-  whenFB(() => FB.XFBML.parse(box));
+  whenFB(() => FB.XFBML.parse(wrap));
   clearTimeout(open.t);
   open.t = setTimeout(() => {
     if (cur === id && !player) msg('Video không mở được — có thể video riêng tư / trong nhóm kín, hoặc link rút gọn. Mở video trên Facebook, bấm Chia sẻ → Sao chép liên kết, hoặc copy link từ thanh địa chỉ.', true);
@@ -285,6 +317,7 @@ window.fbAsyncInit = function () {
   FB.Event.subscribe('xfbml.ready', e => {
     if (e.type !== 'video') return;
     player = e.instance;
+    watchSize();
     clearTimeout(open.t);
     const v = db[cur];
     const xong = v && v.dur && v.pos > v.dur - 10;
@@ -312,10 +345,11 @@ const isShort = href => /facebook\.com\/share\/|fb\.watch\//.test(href);
 async function go() {
   let r = parse($('#link').value);
   if (!r) { msg('Link này không phải link Facebook.', true); return; }
+  let j = null;
   if (isShort(r.href)) {
     msg('Đang đổi link rút gọn…');
     try {
-      const j = await (await fetch(RESOLVER + '/?u=' + encodeURIComponent(r.href))).json();
+      j = await (await fetch(RESOLVER + '/?u=' + encodeURIComponent(r.href))).json();
       const r2 = j.url && parse(j.url);
       if (!r2 || isShort(r2.href)) throw 0;
       r = r2;
@@ -329,6 +363,33 @@ async function go() {
   save();
   startTick.once = false;
   open(r.id);
+  j ? applyInfo(r.id, j) : fetchInfo(r.id);
+}
+
+// Tên phim + ảnh bìa lấy từ trang Facebook (qua Worker). Ảnh fbcdn hết hạn sau vài ngày
+// nên thu nhỏ rồi cất luôn trong máy.
+async function fetchInfo(id) {
+  const v = db[id];
+  if (!v || fetchInfo[id]) return;
+  fetchInfo[id] = 1;
+  try { applyInfo(id, await (await fetch(RESOLVER + '/?u=' + encodeURIComponent(v.href))).json()); } catch {}
+}
+function applyInfo(id, j) {
+  const v = db[id];
+  if (!v || !j) return;
+  if (j.title && !v.name) { v.name = j.title; save(); render(); }
+  if (j.image && !v.thumb) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const W = 160, H = 214, c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const s = Math.max(W / img.width, H / img.height);
+      c.getContext('2d').drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
+      try { v.thumb = c.toDataURL('image/jpeg', .72); save(); render(); } catch {}
+    };
+    img.src = RESOLVER + '/?img=' + encodeURIComponent(j.image);
+  }
 }
 
 function nameOf(v, id) { return v.name || ('Video ' + (/^\d+$/.test(id) ? '…' + id.slice(-5) : v.href.replace(/^https:\/\/www\./, ''))); }
@@ -374,7 +435,8 @@ function render() {
       '<circle cx="23" cy="23" r="' + R + '" fill="none" stroke="' + c1 + '" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="' + C + '" style="transition:stroke-dashoffset .6s"/></svg><span class="pct"></span></div>' +
       '<button class="more" aria-label="Thêm"><svg width="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>';
     el.querySelector('.name').textContent = nameOf(v, id);
-    el.querySelector('.poster span').textContent = (v.name || '▶').trim().charAt(0).toUpperCase();
+    if (v.thumb) el.querySelector('.poster').style.background = 'center/cover url(' + v.thumb + ')';
+    else el.querySelector('.poster span').textContent = (v.name || '▶').trim().charAt(0).toUpperCase();
     el.querySelector('.track i').style.background = 'linear-gradient(90deg,' + c1 + ',' + c2 + ')';
     const play = () => { startTick.once = false; open(id); scrollTo({ top: 0, behavior: 'smooth' }); };
     el.querySelector('.poster').onclick = play;
@@ -412,11 +474,64 @@ document.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => {
   player.seek(Math.max(0, player.getCurrentPosition() + +b.dataset.skip));
   setTimeout(record, 400);
 });
+// ---- Cỡ khung phim + xem ngang ----
+let BIG = 1280;
+function layout() {
+  const box = $('#player'), fv = box.querySelector('.fbwrap'), f = box.querySelector('iframe');
+  if (!fv) return;
+  const W = (f && f.offsetWidth) || BIG, H = (f && f.offsetHeight) || BIG * 9 / 16;
+  fv.style.width = W + 'px';
+  const ui = $('#ngangUi');
+  if (!document.body.classList.contains('ngang')) {
+    const s = box.clientWidth / W;
+    fv.style.transform = 'scale(' + s + ')';
+    box.style.height = Math.round(H * s) + 'px';
+    return;
+  }
+  const vw = innerWidth, vh = innerHeight;
+  if (vw >= vh) {
+    // Máy đã nằm ngang thật (Android khoá hướng / người dùng tự xoay) → chỉ phóng đầy
+    const s = Math.min(vw / W, vh / H);
+    fv.style.transform = `translate(${(vw - W * s) / 2}px, ${(vh - H * s) / 2}px) scale(${s})`;
+    ui.style.width = vw + 'px'; ui.style.height = vh + 'px'; ui.style.transform = 'none';
+  } else {
+    // Máy dựng đứng → xoay khung 90° theo chiều kim đồng hồ (cầm máy nghiêng sang trái)
+    const s = Math.min(vh / W, vw / H);
+    fv.style.transform = `translate(${(vw + H * s) / 2}px, ${(vh - W * s) / 2}px) rotate(90deg) scale(${s})`;
+    ui.style.width = vh + 'px'; ui.style.height = vw + 'px'; ui.style.transform = `translateX(${vw}px) rotate(90deg)`;
+  }
+}
+// FB đổi cỡ khung khi biết tỉ lệ video (phim dọc/ngang) → canh lại
+function watchSize() {
+  const f = $('#player iframe');
+  if (f && window.ResizeObserver) new ResizeObserver(layout).observe(f);
+  layout();
+}
+async function vaoNgang() {
+  document.body.classList.add('ngang');
+  // Android: thử toàn màn hình + khoá hướng ngang thật; iPhone không hỗ trợ → dùng xoay CSS
+  try {
+    await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+    await screen.orientation?.lock?.('landscape');
+  } catch {}
+  layout();
+}
+function raNgang() {
+  document.body.classList.remove('ngang');
+  try { screen.orientation?.unlock?.(); } catch {}
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  layout();
+}
+$('#ngang').onclick = vaoNgang;
+$('#thoat').onclick = raNgang;
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('ngang')) raNgang(); });
+addEventListener('resize', layout);
+
 addEventListener('pagehide', record);
 document.addEventListener('visibilitychange', () => { if (document.hidden) record(); });
 
 // Điện thoại hay giữ bản cũ trong bộ nhớ đệm → hỏi máy chủ, có bản mới thì tải lại 1 lần
-const VER = '3';
+const VER = '4';
 fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).then(t => {
   const m = t.match(/const VER = '(\d+)'/);
   if (m && m[1] !== VER && sessionStorage.getItem('xt.reload') !== m[1]) {
@@ -427,7 +542,8 @@ fetch('./?nocache=' + Date.now(), { cache: 'no-store' }).then(r => r.text()).the
 
 // Mở lại app → tự mở phim xem gần nhất
 render();
-const last = Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
+for (const id in db) if (!db[id].name || !db[id].thumb) fetchInfo(id);
+const last =Object.keys(db).sort((a, b) => db[b].last - db[a].last)[0];
 if (last) open(last);
 </script>
 <script async defer crossorigin="anonymous" src="https://connect.facebook.net/vi_VN/sdk.js"></script>
